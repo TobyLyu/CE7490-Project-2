@@ -1,0 +1,16 @@
+version: "3.3"
+services:
+  RAID6:
+    build:
+      context: .
+      # dockerfile: ./docker-frontend_local/Dockerfile
+    image: tobylyu/raid6
+    container_name: raid6
+    stdin_open: true
+    volumes:
+      - raid6disk1:/media/disk1
+    # tty: true
+  
+volumes:
+  raid6disk1:
+    external: true
