@@ -132,7 +132,7 @@ class GaloisField:
             s_out = self.add(s_out, i)
         return s_out
     
-    def vec_dot(self, i_a, i_b):
+    def vec_dot(self, v_a, v_b):
         """GF vector inner product
 
         Args:
@@ -142,8 +142,8 @@ class GaloisField:
         Returns:
             int: output c
         """
-        v_a = copy.deepcopy(i_a)
-        v_b = copy.deepcopy(i_b)
+        # v_a = copy.deepcopy(i_a)
+        # v_b = copy.deepcopy(i_b)
         assert len(v_a) == len(v_b)
         if type(v_a) == list:
             v_a = np.array(v_a)
@@ -151,7 +151,7 @@ class GaloisField:
             v_b = np.array(v_b)
         log_sum = ((self.gflog[v_a] + self.gflog[v_b]) % (self.max_mask - 1)).astype(int)
         v_c = (self.gfilog[log_sum]).astype(int)
-        if any(v_a == 0) or any(v_b == 0): # filter out zero multiply
+        if any(v_a * v_b == 0): # filter out zero multiply
             zero_idx = ~v_a.astype(bool) | ~v_b.astype(bool)
             v_c[zero_idx] = 0
         return np.bitwise_xor.reduce(v_c)
