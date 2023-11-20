@@ -96,8 +96,8 @@ class Controller(Monitor, RAID6):
             # print(len(self.__content_cache), max(self.__content_cache))
             self.content_len = len(self.__content_cache)
     
-    def write_to_system(self):
-        with open("D:\CE7490\CE7490-Project-2\output_data\colorbar_bi.png", 'wb') as f:
+    def write_to_system(self, path):
+        with open(path, 'wb') as f:
             byte_data = bytes(self.__content_cache)
             f.write(byte_data)
     
@@ -137,7 +137,7 @@ class Controller(Monitor, RAID6):
         
         self.files_info[self.filename] = [self.stripe_len, self.content_len]
         with open(self.files_info_path, 'a+') as f:
-            f.writelines([self.filename, ',',  str(self.stripe_len), ',', str(self.content_len)])
+            f.writelines([self.filename, ',',  str(self.stripe_len), ',', str(self.content_len), '\n'])
     
     def splitter(self):
         """split the whole file into different disk partition
@@ -179,7 +179,7 @@ class Controller(Monitor, RAID6):
             path = os.path.join(os.getcwd(), 'output_data', filename)
             self.read_from_disk()
             self.combiner()
-            self.write_to_system()
+            self.write_to_system(path)
     
 if __name__ == "__main__":
     # test case
