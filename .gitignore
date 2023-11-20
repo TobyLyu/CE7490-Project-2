@@ -1,4 +1,4 @@
-core/src/__pycache__/*
+core/src/__pycache__/
 output_data/
 input_data/
 storage/

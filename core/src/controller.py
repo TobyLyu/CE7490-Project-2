@@ -1,9 +1,10 @@
 import numpy as np
 import copy
 import ipdb
-from GaloisField import GaloisField
-from Monitor import Monitor
-import struct
+from core.src.GaloisField import GaloisField
+from core.src.Monitor import Monitor
+# import struct
+import os
 
 class RAID6(GaloisField):
     def __init__(self, w, n, m) -> None:
@@ -38,7 +39,17 @@ class RAID6(GaloisField):
         bit_in = copy.deepcopy(bit_str)
         return self.matrix_multiply(self.A, bit_str)
     
-    def decode(self, bit_str, use_disk):
+    def decode(self, bit_str):
+        
+        assert bit_str.shape[0] == self.A.shape[1]
+        print(self.A[:self.num_data_disk, :])
+        A_i = self.matrix_inverse(self.A[:self.num_data_disk, :])
+        return self.matrix_multiply(A_i, bit_str)
+    
+    def update(self):
+        pass
+    
+    def restore(self, bit_str, use_disk):
         """decode the input bit string from data or checksum
 
         Args:
@@ -48,6 +59,9 @@ class RAID6(GaloisField):
         Returns:
             nparray: decoded output
         """
+        # ipdb.set_trace()
+        assert bit_str.shape[0] == len(use_disk)
+        assert bit_str.shape[0] == self.A.shape[1]
         if type(use_disk) == list:
             use_disk = np.array(use_disk, dtype = int)
         use_disk -= 1
@@ -55,20 +69,17 @@ class RAID6(GaloisField):
         return self.matrix_multiply(A_i, bit_str)
     
     
+    
 class Controller(Monitor, RAID6):
     def __init__(self) -> None:
         Monitor.__init__(self)
         RAID6.__init__(self, w=int(8*self.chunk_size), n=self.num_data_disk, m=self.num_check_disk)
         self.__content_cache = []
-        self.create_fake_disk()
     
     def reset(self):
         self.__content_cache = []
-    
-    def create_fake_disk(self):
-        for i in range(self.num_of_disk):
-            with open("D:\CE7490\CE7490-Project-2\storage\disk{}.txt".format(i+1), 'w') as f:
-                pass
+        self.stripe_len = 0
+        self.content_len = 0
 
     
     def read_from_system(self, path):
@@ -90,27 +101,43 @@ class Controller(Monitor, RAID6):
             byte_data = bytes(self.__content_cache)
             f.write(byte_data)
     
-    def read_from_disk(self, disk_list):
-        print(disk_list)
-        enc_str = np.zeros([self.stripe_len, len(disk_list)], dtype=int)
-        for idx, i in enumerate(disk_list):
-            with open("D:\CE7490\CE7490-Project-2\storage\disk{}.txt".format(i), 'rb') as f:
-                enc_str[:, idx] = list(f.read())
-        # for idx, enc in enumerate(enc_str):
-            # enc_str[idx, :] = np.roll(enc, (idx % self.num_data_disk)) # read checksum from all disks
-        print(enc_str)
-        self.__content_cache = self.decode(enc_str.T, disk_list).T
+    def read_from_disk(self):
+        self.stripe_len = int(self.files_info[self.filename][0])
+        if all(self.disk_status):
+            enc_str = np.zeros([self.stripe_len, self.num_data_disk], dtype=int)
+            for idx in range(self.num_data_disk):
+                with open(self.disk_path[idx], 'rb') as f:
+                    enc_str[:, idx] = list(f.read())     
+            # for idx, enc in enumerate(enc_str):
+            #     enc_str[idx, :] = np.roll(enc, (idx % self.num_data_disk)) #
+            self.__content_cache = self.decode(enc_str.T).T
+        else:
+            disk_list = np.arange(1, self.total_num_of_disk+1)
+            alive_disk = disk_list[self.disk_status][:self.num_data_disk]
+            enc_str = np.zeros([self.stripe_len, len(alive_disk)], dtype=int)
+            for idx, i in enumerate(alive_disk):
+                with open(self.disk_path[i-1], 'rb') as f:
+                    enc_str[:, idx] = list(f.read())
+            # for idx, enc in enumerate(enc_str):
+            #     enc_str[idx, :] = np.roll(enc, (idx % self.num_data_disk)) # read checksum from all disks
+            print(enc_str)
+            self.__content_cache = self.restore(enc_str.T, alive_disk).T
     
     def write_to_disk(self):
         enc_str = self.encode(self.__content_cache.T).T
         # print(enc_str)
-        print(enc_str)
         # for idx, enc in enumerate(enc_str):
-            # enc_str[idx, :] = np.roll(enc, -(idx % self.num_data_disk)) # save checksum into all disks
+        #     enc_str[idx, :] = np.roll(enc, -(idx % self.num_data_disk)) # save checksum into all disks
+        
+        print(enc_str)
         for i in range(self.num_of_disk):
-            with open("D:\CE7490\CE7490-Project-2\storage\disk{}.txt".format(i+1), 'wb') as f:
+            with open(self.disk_path[i], 'wb') as f:
                 byte_data = bytes(enc_str[:, i].tolist())
                 f.write(byte_data)
+        
+        self.files_info[self.filename] = [self.stripe_len, self.content_len]
+        with open(self.files_info_path, 'a+') as f:
+            f.writelines([self.filename, ',',  str(self.stripe_len), ',', str(self.content_len)])
     
     def splitter(self):
         """split the whole file into different disk partition
@@ -119,26 +146,38 @@ class Controller(Monitor, RAID6):
         self.stripe_len = self.content_len // self.num_data_disk + 1
         self.__content_cache = self.__content_cache + [0] * (self.stripe_len * self.num_data_disk - self.content_len)
         self.__content_cache = np.asarray(self.__content_cache).astype(int).reshape([self.stripe_len, self.num_data_disk])
+        
         print(self.__content_cache.shape)
     
     def combiner(self):
+        self.content_len = int(self.files_info[self.filename][1])
         print(self.__content_cache.shape)
         self.__content_cache = self.__content_cache.reshape(-1)
         self.__content_cache = self.__content_cache[:self.content_len].tolist()
         print(self.__content_cache[:10])
     
-    def process(self, mode, filepath):
+    def process(self, mode, filename):
         self.reset()
+        self.filename = filename
+        
         # filepath = "D:\CE7490\CE7490-Project-2\input_data\PureMagLocalization-ShenHongming.pptx"
         
         if mode == "write":
-            filepath = "D:\CE7490\CE7490-Project-2\input_data\colorbar_bi.png"
-            self.read_from_system(filepath)
+            if filename in self.files_info:
+                print("File with same name exist.")
+                # ipdb.set_trace()
+                return
+            path = os.path.join(os.getcwd(), 'input_data', filename)
+            self.read_from_system(path)
             self.splitter()
             self.write_to_disk()
         
         if mode == "read":
-            self.read_from_disk([3,4,5,6,7, 8])
+            if self.num_check_disk < self.total_num_of_disk - sum(self.disk_status):
+                print("Critical Error! Data cannot be restored.")
+                return
+            path = os.path.join(os.getcwd(), 'output_data', filename)
+            self.read_from_disk()
             self.combiner()
             self.write_to_system()
     
@@ -157,5 +196,5 @@ if __name__ == "__main__":
     # print(rd6.decode(pw, [0, 3, 4, 5, 6, 7, 8, 9]).T)
     
     cont = Controller()
-    cont.process(mode="write", filepath=[])
-    cont.process(mode="read", filepath=[])
+    # cont.process(mode="write", filename="colorbar_bi.png")
+    cont.process(mode="read", filename="colorbar_bi.png")

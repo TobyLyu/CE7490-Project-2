@@ -1,0 +1,4 @@
+chunk_size: 1
+num_check_disk: 2
+num_data_disk: 6
+total_num_of_disk: 8
