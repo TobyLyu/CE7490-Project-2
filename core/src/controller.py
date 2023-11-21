@@ -28,7 +28,7 @@ class RAID6(GaloisField):
         """encode the input bit string with checksum
 
         Args:
-            bit_str (nparray): Nx1 input data
+            bit_str (nparray): Nxstripe_len input data
 
         Returns:
             nparray: encoded output with checksum
@@ -172,26 +172,30 @@ class Controller(Monitor, RAID6):
         # filepath = "D:\CE7490\CE7490-Project-2\input_data\PureMagLocalization-ShenHongming.pptx"
         
         if mode == "write":
+            if sum(self.disk_status) < self.total_num_of_disk:
+                return [1, "Disk {} failed! Place replace and rebuild it first!".format(self.disk_name[~self.disk_status])]
             if filename in self.files_info:
                 print("File with same name exist.")
                 # ipdb.set_trace()
-                return
+                return [2, "File with same name exist."]
             path = os.path.join(os.getcwd(), 'input_data', filename)
             self.read_from_system(path)
             self.splitter()
             self.write_to_disk()
+            return [0, "Success!"]
         
         if mode == "read":
             if filename not in self.files_info:
                 print("Fail to find {} in RAID6 disk.".format(filename))
-                return
+                return [3, "Fail to find {} in RAID6 disk.".format(filename)]
             if self.num_check_disk < self.total_num_of_disk - sum(self.disk_status):
                 print("Critical Error! Data cannot be restored.")
-                return
+                return [1, "Critical Error! Data cannot be restored."]
             path = os.path.join(os.getcwd(), 'output_data', filename)
             self.read_from_disk()
             self.combiner()
             self.write_to_system(path)
+            return [0, "Success!"]
     
 if __name__ == "__main__":
     # test case
@@ -210,3 +214,4 @@ if __name__ == "__main__":
     cont = Controller()
     cont.process(mode="write", filename="colorbar_bi.png")
     cont.process(mode="read", filename="colorbar_bi.png")
+    cont.save_system_info()

@@ -15,27 +15,28 @@ class Monitor:
         path = os.path.join(os.getcwd(), 'core/config/config.yml')
         with open(path, 'r') as file:
             self.config = yaml.safe_load(file)
-            
         self.total_num_of_disk = self.config['total_num_of_disk']
         self.num_data_disk = self.config['num_data_disk']
         self.num_check_disk = self.config['num_check_disk']
         self.chunk_size = self.config['chunk_size']
+        self.disk_status = np.array(self.config['disk_status'], dtype=bool)
         self.strip_size = self.num_data_disk * self.chunk_size
         
-        self.disk_name = ["disk{}.bin".format(i+1) for i in range(self.total_num_of_disk)]
+        self.disk_name = np.array(["disk{}.bin".format(i+1) for i in range(self.total_num_of_disk)])
         self.disk_path = []
-        self.disk_status = []
-        for disk_name in self.disk_name:
-            self.disk_path.append(os.path.join(os.getcwd(), "storage", disk_name))
-            self.disk_status.append(False)
+        # self.disk_status = []
+        # for disk_name in self.disk_name:
+        #     self.disk_path.append(os.path.join(os.getcwd(), "storage", disk_name))
+        #     self.disk_status.append(False)
+        # self.disk_status = np.array(self.disk_status)
         
     def detect_storage(self):
         disk_lst = os.listdir(os.path.join(os.getcwd(), 'storage'))
         self.num_of_disk = len(disk_lst)
+        disk_on = np.zeros(len(self.disk_status), dtype=bool)
         for disk_name in disk_lst:
-            # ipdb.set_trace()
-            self.disk_status[self.disk_name.index(disk_name)] = True
-            
+            disk_on[np.where(self.disk_name == disk_name)[0]] = True
+        self.disk_status = self.disk_status & disk_on
             
     def gen_file_list(self):
         self.files_info = dict()
@@ -48,6 +49,22 @@ class Monitor:
         else:
             with open(self.files_info_path, 'w') as f:
                 pass
+            
+    def save_system_info(self):
+        data = {"total_num_of_disk": self.total_num_of_disk,
+                "num_data_disk": self.num_data_disk,
+                "num_check_disk": self.num_check_disk,
+                "chunk_size": self.chunk_size,
+                "disk_status": self.disk_status.tolist()
+                }
+        
+        folder = os.path.join(os.getcwd(), 'core/config')
+        if not os.path.exists(folder):
+            os.mkdir(folder)
+        path = os.path.join(os.getcwd(), 'core/config/config.yml')
+        with open(path, 'w') as file:
+            yaml.safe_dump(data, file)
+        
 
 class Simulator():
     def __init__(self) -> None:
@@ -58,7 +75,8 @@ class Simulator():
         data = {"total_num_of_disk": self.total_num_of_disk,
                 "num_data_disk": self.num_data_disk,
                 "num_check_disk": self.num_check_disk,
-                "chunk_size": self.chunk_size
+                "chunk_size": self.chunk_size,
+                "disk_status": [True for _ in range(self.total_num_of_disk)]
                 }
         
         folder = os.path.join(os.getcwd(), 'core/config')
