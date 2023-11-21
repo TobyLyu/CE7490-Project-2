@@ -31,6 +31,9 @@ class Monitor:
         # self.disk_status = np.array(self.disk_status)
         
     def detect_storage(self):
+        if not os.path.exists(os.path.join(os.getcwd(), 'storage')):
+            self.disk_status = np.zeros(len(self.disk_status), dtype=bool)
+            return 1
         disk_lst = os.listdir(os.path.join(os.getcwd(), 'storage'))
         self.num_of_disk = len(disk_lst)
         disk_on = np.zeros(len(self.disk_status), dtype=bool)
@@ -69,7 +72,7 @@ class Monitor:
 
 class Simulator():
     def __init__(self) -> None:
-        # self.path = 
+        self.config_set = False
         pass
     
     def save_system_info(self):
@@ -88,13 +91,15 @@ class Simulator():
             yaml.safe_dump(data, file)
             
             
-    def set_system_info(self):
-        self.total_num_of_disk = 8
-        self.num_data_disk = 6
-        self.num_check_disk = 2
-        self.chunk_size = 1
+    def set_system_info(self, num_of_disk, data_disk, check_disk, chunk_size):
+        self.total_num_of_disk = num_of_disk
+        self.num_data_disk = data_disk
+        self.num_check_disk = check_disk
+        self.chunk_size = chunk_size
+        self.save_system_info()
+        self.config_set = True
     
-    def create_database(self):
+    def create_database(self, num_of_disk):
         folder = os.path.join(os.getcwd(), "storage")
         if not os.path.exists(folder):
             os.mkdir(folder)
@@ -103,8 +108,16 @@ class Simulator():
         if not os.path.exists(folder):
             os.mkdir(folder)
                     
-        for i in range(self.total_num_of_disk):
-            self.create_fake_disk(i+1)
+        folder = os.path.join(os.getcwd(), "input_data")
+        if not os.path.exists(folder):
+            os.mkdir(folder)
+                    
+        folder = os.path.join(os.getcwd(), "output_data")
+        if not os.path.exists(folder):
+            os.mkdir(folder)
+            
+        for i in range(num_of_disk):
+            self.create_disk(i+1)
             # path = os.path.join(os.getcwd(), "storage", "disk{}.bin".format(i+1))
             # if os.path.exists(path):
             #     continue
@@ -128,3 +141,5 @@ class Simulator():
             shutil.rmtree(os.path.join(os.getcwd(), "storage/"))
         if os.path.exists(os.path.join(os.getcwd(), "core/config/")):
             shutil.rmtree(os.path.join(os.getcwd(), "core/config/"))
+        if os.path.exists(os.path.join(os.getcwd(), "output_data/")):
+            shutil.rmtree(os.path.join(os.getcwd(), "output_data/"))

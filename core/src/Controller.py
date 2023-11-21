@@ -3,6 +3,8 @@ import copy
 import ipdb
 from core.src.GaloisField import GaloisField
 from core.src.Monitor import Monitor
+# from GaloisField import GaloisField
+# from Monitor import Monitor
 # import struct
 import os
 
@@ -16,7 +18,7 @@ class RAID6(GaloisField):
             m (int): num of checksum disk
         """
         super().__init__(w = w)
-        self.disk_num = n
+        self.data_num = n
         self.check_num = m
         self.F = np.zeros([m, n], dtype=int)
         for i in range(0, m):
@@ -50,8 +52,8 @@ class RAID6(GaloisField):
     def decode(self, bit_str):
         
         assert bit_str.shape[0] == self.A.shape[1]
-        print(self.A[:self.num_data_disk, :])
-        A_i = self.matrix_inverse(self.A[:self.num_data_disk, :])
+        # print(self.A[:self.data_num, :])
+        A_i = self.matrix_inverse(self.A[:self.data_num, :])
         return self.matrix_multiply(A_i, bit_str)
     
     def update(self):
@@ -127,7 +129,7 @@ class Controller(Monitor, RAID6):
             
             # due to matrix multiply is slow, we do not decode if disk is healthy
             # self.__content_cache = self.decode(enc_str.T).T
-            self.__content_cache = enc_str[:self.num_data_disk, :]
+            self.__content_cache = enc_str[:, :self.num_data_disk]
         else:
             disk_list = np.arange(1, self.total_num_of_disk+1)
             alive_disk = disk_list[self.disk_status][:self.num_data_disk]
@@ -138,7 +140,7 @@ class Controller(Monitor, RAID6):
                     enc_str[:, idx] = list(f.read(stripe_len))
             # for idx, enc in enumerate(enc_str):
             #     enc_str[idx, :] = np.roll(enc, (idx % self.num_data_disk)) # read checksum from all disks
-            print(enc_str)
+            # print(enc_str)
             self.__content_cache = self.restore(enc_str.T, alive_disk).T
     
     def write_to_disk(self):
@@ -147,7 +149,7 @@ class Controller(Monitor, RAID6):
         # for idx, enc in enumerate(enc_str):
         #     enc_str[idx, :] = np.roll(enc, -(idx % self.num_data_disk)) # save checksum into all disks
         
-        print(enc_str)
+        # print(enc_str)
         for i in range(self.total_num_of_disk):
             with open(self.disk_path[i], 'ab+') as f:
                 # ipdb.set_trace()
@@ -162,19 +164,19 @@ class Controller(Monitor, RAID6):
     def splitter(self):
         """split the whole file into different disk partition
         """
-        print(self.__content_cache[:10])
+        # print(self.__content_cache[:10])
         self.stripe_len = self.content_len // self.num_data_disk + 1
         self.__content_cache = self.__content_cache + [0] * (self.stripe_len * self.num_data_disk - self.content_len)
         self.__content_cache = np.asarray(self.__content_cache).astype(int).reshape([self.stripe_len, self.num_data_disk])
         
-        print(self.__content_cache.shape)
+        # print(self.__content_cache.shape)
     
     def combiner(self):
         content_len = int(self.files_info[self.filename][2])
-        print(self.__content_cache.shape)
+        # print(self.__content_cache.shape)
         self.__content_cache = self.__content_cache.reshape(-1)
         self.__content_cache = self.__content_cache[:content_len].tolist()
-        print(self.__content_cache[:10])
+        # print(self.__content_cache[:10])
     
     def rebuild_disk(self):
         enc_str = self.encode(self.__content_cache.T).T
@@ -237,17 +239,17 @@ if __name__ == "__main__":
     # test case
     rd6 = RAID6(w=4, n=6, m=2)
     pw = rd6.encode(np.array([[13, 14, 15, 10, 11, 12]], dtype=int).T)
-    print(rd6.decode(pw, [0, 1, 2, 4, 5, 7]).T)
+    print(rd6.decode(pw[:6]))
     
     rd6 = RAID6(w=8, n=6, m=2)
     pw = rd6.encode(np.array([[32, 12, 24, 47, 10, 22]], dtype=int).T)
-    print(rd6.decode(pw, [0, 1, 2, 4, 5, 7]).T)
+    print(rd6.decode(pw[:6]))
     
     rd6 = RAID6(w=16, n=8, m=2)
     pw = rd6.encode(np.array([[543, 1231, 23425, 33, 765, 41435, 214, 27383]], dtype=int).T)
-    print(rd6.decode(pw, [0, 3, 4, 5, 6, 7, 8, 9]).T)
+    print(rd6.decode(pw[:8]))
     
     cont = Controller()
-    cont.process(mode="write", filename="colorbar_bi.png")
-    cont.process(mode="read", filename="colorbar_bi.png")
+    cont.process(mode="write", filename=["colorbar_bi.png"])
+    cont.process(mode="read", filename=["colorbar_bi.png"])
     cont.save_system_info()

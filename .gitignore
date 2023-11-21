@@ -2,4 +2,5 @@ core/src/__pycache__/
 output_data/
 input_data/
 storage/
-core/config/*
+core/config/files.csv
+core/config/config.yml
