@@ -25,9 +25,9 @@ class Monitor:
         self.disk_name = np.array(["disk{}.bin".format(i+1) for i in range(self.total_num_of_disk)])
         self.disk_path = []
         # self.disk_status = []
-        # for disk_name in self.disk_name:
-        #     self.disk_path.append(os.path.join(os.getcwd(), "storage", disk_name))
-        #     self.disk_status.append(False)
+        for disk_name in self.disk_name:
+            self.disk_path.append(os.path.join(os.getcwd(), "storage", disk_name))
+            # self.disk_status.append(False)
         # self.disk_status = np.array(self.disk_status)
         
     def detect_storage(self):
@@ -37,6 +37,7 @@ class Monitor:
         for disk_name in disk_lst:
             disk_on[np.where(self.disk_name == disk_name)[0]] = True
         self.disk_status = self.disk_status & disk_on
+        self.disk_on = disk_on
             
     def gen_file_list(self):
         self.files_info = dict()
@@ -93,20 +94,34 @@ class Simulator():
         self.num_check_disk = 2
         self.chunk_size = 1
     
-    
-    def create_fake_disk(self):
+    def create_database(self):
         folder = os.path.join(os.getcwd(), "storage")
         if not os.path.exists(folder):
             os.mkdir(folder)
-        for i in range(self.total_num_of_disk):
-            path = os.path.join(os.getcwd(), "storage", "disk{}.bin".format(i+1))
-            if os.path.exists(path):
-                continue
-            with open(path, 'w') as f:
-                pass
             
-    def delete_fake_disk(self, n):
-        os.remove(os.path.join(os.getcwd(), "storage", "disk{}.bin".format(n)))
+        folder = os.path.join(os.getcwd(), "core/config")
+        if not os.path.exists(folder):
+            os.mkdir(folder)
+                    
+        for i in range(self.total_num_of_disk):
+            self.create_fake_disk(i+1)
+            # path = os.path.join(os.getcwd(), "storage", "disk{}.bin".format(i+1))
+            # if os.path.exists(path):
+            #     continue
+            # with open(path, 'w') as f:
+            #     pass
+            
+    def create_disk(self, n):
+        path = os.path.join(os.getcwd(), "storage", "disk{}.bin".format(n))
+        if os.path.exists(path):
+            return
+        with open(path, 'w') as f:
+            pass
+            
+    def delete_disk(self, n):
+        path = os.path.join(os.getcwd(), "storage", "disk{}.bin".format(n))
+        if os.path.exists(path):
+            os.remove(os.path.join(os.getcwd(), "storage", "disk{}.bin".format(n)))
         
     def erase_database(self):
         if os.path.exists(os.path.join(os.getcwd(), "storage/")):

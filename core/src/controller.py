@@ -28,7 +28,7 @@ class RAID6(GaloisField):
         """encode the input bit string with checksum
 
         Args:
-            bit_str (nparray): Nxstripe_len input data
+            bit_str (nparray): N x {stripe_len} input data
 
         Returns:
             nparray: encoded output with checksum
@@ -37,7 +37,15 @@ class RAID6(GaloisField):
         # ipdb.set_trace()
         assert self.A.shape[1] == bit_str.shape[0]
         bit_in = copy.deepcopy(bit_str)
-        return self.matrix_multiply(self.A, bit_str)
+        
+        # this calculation is slow and think the above I matrix is not necessary
+        # self.matrix_multiply(self.A, bit_in)
+        # return self.matrix_multiply(self.A, bit_in)
+        
+        # so we only ccalculate the checksum bit only
+        check_bit = self.matrix_multiply(self.A[-self.check_num:, :], bit_in)
+        return np.hstack([bit_str.T, check_bit.T]).T
+        
     
     def decode(self, bit_str):
         
@@ -116,7 +124,10 @@ class Controller(Monitor, RAID6):
                     enc_str[:, idx] = list(f.read(stripe_len))     
             # for idx, enc in enumerate(enc_str):
             #     enc_str[idx, :] = np.roll(enc, (idx % self.num_data_disk)) #
-            self.__content_cache = self.decode(enc_str.T).T
+            
+            # due to matrix multiply is slow, we do not decode if disk is healthy
+            # self.__content_cache = self.decode(enc_str.T).T
+            self.__content_cache = enc_str[:self.num_data_disk, :]
         else:
             disk_list = np.arange(1, self.total_num_of_disk+1)
             alive_disk = disk_list[self.disk_status][:self.num_data_disk]
@@ -137,14 +148,14 @@ class Controller(Monitor, RAID6):
         #     enc_str[idx, :] = np.roll(enc, -(idx % self.num_data_disk)) # save checksum into all disks
         
         print(enc_str)
-        for i in range(self.num_of_disk):
+        for i in range(self.total_num_of_disk):
             with open(self.disk_path[i], 'ab+') as f:
                 # ipdb.set_trace()
                 start_p = f.tell()
                 byte_data = bytes(enc_str[:, i].tolist())
                 f.write(byte_data)
         
-        self.files_info[self.filename] = [self.stripe_len, self.content_len]
+        self.files_info[self.filename] = [str(start_p), str(self.stripe_len), str(self.content_len)]
         with open(self.files_info_path, 'a+') as f:
             f.writelines([self.filename, ',', str(start_p), ',',  str(self.stripe_len), ',', str(self.content_len), '\n'])
     
@@ -165,37 +176,62 @@ class Controller(Monitor, RAID6):
         self.__content_cache = self.__content_cache[:content_len].tolist()
         print(self.__content_cache[:10])
     
-    def process(self, mode, filename):
-        self.reset()
-        self.filename = filename
+    def rebuild_disk(self):
+        enc_str = self.encode(self.__content_cache.T).T
         
-        # filepath = "D:\CE7490\CE7490-Project-2\input_data\PureMagLocalization-ShenHongming.pptx"
-        
-        if mode == "write":
-            if sum(self.disk_status) < self.total_num_of_disk:
-                return [1, "Disk {} failed! Place replace and rebuild it first!".format(self.disk_name[~self.disk_status])]
-            if filename in self.files_info:
-                print("File with same name exist.")
+        die_disk = np.arange(0, self.total_num_of_disk)[~self.disk_status]
+        for i in die_disk:
+            with open(self.disk_path[i], 'ab+') as f:
                 # ipdb.set_trace()
-                return [2, "File with same name exist."]
-            path = os.path.join(os.getcwd(), 'input_data', filename)
-            self.read_from_system(path)
-            self.splitter()
-            self.write_to_disk()
+                start_p = f.tell()
+                byte_data = bytes(enc_str[:, i].tolist())
+                f.write(byte_data)
+    
+    def process(self, mode, filename):
+        if mode == "write":
+            for file in filename:
+                self.reset()
+                self.filename = file
+                if sum(self.disk_status) < self.total_num_of_disk:
+                    return [1, "Disk {} failed! Place replace and rebuild it first!".format(self.disk_name[~self.disk_status])]
+                if file in self.files_info:
+                    print("File with same name exist.")
+                    # ipdb.set_trace()
+                    return [2, "File with same name exist."]
+                path = os.path.join(os.getcwd(), 'input_data', file)
+                self.read_from_system(path)
+                self.splitter()
+                self.write_to_disk()
             return [0, "Success!"]
         
         if mode == "read":
-            if filename not in self.files_info:
-                print("Fail to find {} in RAID6 disk.".format(filename))
-                return [3, "Fail to find {} in RAID6 disk.".format(filename)]
-            if self.num_check_disk < self.total_num_of_disk - sum(self.disk_status):
-                print("Critical Error! Data cannot be restored.")
-                return [1, "Critical Error! Data cannot be restored."]
-            path = os.path.join(os.getcwd(), 'output_data', filename)
-            self.read_from_disk()
-            self.combiner()
-            self.write_to_system(path)
+            for file in filename:
+                self.reset()
+                self.filename = file
+                if file not in self.files_info:
+                    print("Fail to find {} in RAID6 disk.".format(file))
+                    return [3, "Fail to find {} in RAID6 disk.".format(file)]
+                if self.num_check_disk < self.total_num_of_disk - sum(self.disk_status):
+                    print("Critical Error! Data cannot be restored.")
+                    return [4, "Critical Error! Data cannot be restored."]
+                path = os.path.join(os.getcwd(), 'output_data', file)
+                self.read_from_disk()
+                self.combiner()
+                self.write_to_system(path)
             return [0, "Success!"]
+        
+        if mode == "rebuild":
+            if sum(self.disk_on) != self.total_num_of_disk:
+                return[5, "Please replace the fail disk first!"]
+            for file in filename:
+                self.reset()
+                self.filename = file
+                self.read_from_disk()
+                self.rebuild_disk()
+            self.disk_status[~self.disk_status] = True
+            return [0, "Success!"]
+        
+
     
 if __name__ == "__main__":
     # test case

@@ -28,11 +28,13 @@ def read_file_list() -> list:
     
 def oneselect(evt):
     global selected_value
+    global lbl_disp
     w = evt.widget
     value = [w.get(int(i)) for i in w.curselection()]
     if len(value) == 0:
         pass
     else:
+        lbl_disp.configure(text=value, wraplength=200)
         selected_value = value
         print(w, ',' , value)
     
@@ -46,10 +48,12 @@ def erase_database():
     # to remove the whole database
     simu.erase_database()
 
+def create_database():
+    global simu
     # to create the database
     simu.set_system_info()
     simu.save_system_info()
-    simu.create_fake_disk()
+    simu.create_database()
 
 def write_file(evt):
     global selected_value
@@ -60,7 +64,8 @@ def write_file(evt):
     if len(selected_value) == 0:
         lbl_disp.configure(text="Please select a file and try again!", wraplength=200)
         return
-    [err, msg] = cont.process(mode="write", filename=selected_value[0])
+    lbl_disp.configure(text="Sure! Processing...", wraplength=200)
+    [err, msg] = cont.process(mode="write", filename=selected_value)
     if err == 1:
         rebuild_choice = True
     lbl_disp.configure(text=msg, wraplength=200)
@@ -73,9 +78,22 @@ def read_file(evt):
     if len(selected_value) == 0:
         lbl_disp.configure(text="Please select a file and try again!", wraplength=200)
         return
-    [err, msg] = cont.process(mode="read", filename=selected_value[0])
+    lbl_disp.configure(text="Sure! Processing...", wraplength=200)
+    [err, msg] = cont.process(mode="read", filename=selected_value)
     # if err == 1:
         # open_popup()
+    lbl_disp.configure(text=msg, wraplength=200)
+
+def rebuild_file(evt):
+    global lbl_disp
+    if sum(cont.disk_status) == cont.total_num_of_disk:
+        lbl_disp.configure(text="Rest Assured! Your database is healthy!\n Nothing to rebuild.", 
+                           wraplength=200)
+        return
+    
+    lbl_disp.configure(text="No problem! Rebuilding it...", 
+                       wraplength=200)
+    [err, msg] = cont.process(mode="rebuild", filename=cont.files_info.keys())
     lbl_disp.configure(text=msg, wraplength=200)
 
 def popup_lose_error():
@@ -90,7 +108,6 @@ def popup_lose_error():
         rebuild_choice = True
     else:
         rebuild_choice = False
-    # popup.mainloop()
 
 def popup_lose_disaster():
     # global quit
@@ -99,14 +116,6 @@ def popup_lose_disaster():
                              message="[Disaster Error]\n Sorry lah, your data may have lost permanently!",
                              icon = 'error')
     
-    # popup = tk.Tk()
-    # popup.wm_title("!")
-    # label = tk.Label(popup, text="[Disaster Error] Sorry lah, your data have lost permanently!")
-    # label.pack(side="top", fill="x", pady=10)
-    # B1 = tk.Button(popup, text="Okay", command = popup.destroy)
-    # B1.pack()
-    # popup.mainloop()
-    # quit = True
     
 
 def refresh_sys(evt):
@@ -176,9 +185,9 @@ btn_read = tk.Button(master=frame_btn,
 btn_read.bind("<Button-1>", read_file)
 btn_read.pack(fill="x", side="top", expand="True")
 btn_read = tk.Button(master=frame_btn,
-                   text="Rebuild",
+                   text="<rebuild>",
                    height=3)
-# btn_read.bind("<Button-1>", read_file)
+btn_read.bind("<Button-1>", rebuild_file)
 btn_read.pack(fill="x", side="top", expand="True")
 
 
@@ -220,10 +229,11 @@ while True: # Only exits, because update cannot be used on a destroyed applicati
         cont.save_system_info()
         print("[Disaster Error] Sorry lah, your data have lost permanently!")
         break
-    
-    if sum(cont.disk_status) < cont.total_num_of_disk and rebuild_choice:
-        popup_lose_error()
+    elif sum(cont.disk_status) < cont.total_num_of_disk and rebuild_choice:
+        popup_lose_error() # this will pop up once even if more disk fail later
         print("Disk {} failed! Place replace and rebuild it first!".format(cont.disk_name[~cont.disk_status]))
+        if rebuild_choice:
+            rebuild_file(0)
     
     
     root.update()
