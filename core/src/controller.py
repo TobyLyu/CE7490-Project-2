@@ -68,6 +68,9 @@ class RAID6(GaloisField):
         A_i = self.matrix_inverse(self.A[use_disk, :])
         return self.matrix_multiply(A_i, bit_str)
     
+    def update(self, bit_str):
+        pass
+    
     
     
 class Controller(Monitor, RAID6):
@@ -80,6 +83,7 @@ class Controller(Monitor, RAID6):
         self.__content_cache = []
         self.stripe_len = 0
         self.content_len = 0
+        self.filename = []
 
     
     def read_from_system(self, path):
@@ -102,22 +106,25 @@ class Controller(Monitor, RAID6):
             f.write(byte_data)
     
     def read_from_disk(self):
-        self.stripe_len = int(self.files_info[self.filename][0])
+        start_p = int(self.files_info[self.filename][0])
+        stripe_len = int(self.files_info[self.filename][1])
         if all(self.disk_status):
-            enc_str = np.zeros([self.stripe_len, self.num_data_disk], dtype=int)
+            enc_str = np.zeros([stripe_len, self.num_data_disk], dtype=int)
             for idx in range(self.num_data_disk):
                 with open(self.disk_path[idx], 'rb') as f:
-                    enc_str[:, idx] = list(f.read())     
+                    f.seek(start_p, 0)
+                    enc_str[:, idx] = list(f.read(stripe_len))     
             # for idx, enc in enumerate(enc_str):
             #     enc_str[idx, :] = np.roll(enc, (idx % self.num_data_disk)) #
             self.__content_cache = self.decode(enc_str.T).T
         else:
             disk_list = np.arange(1, self.total_num_of_disk+1)
             alive_disk = disk_list[self.disk_status][:self.num_data_disk]
-            enc_str = np.zeros([self.stripe_len, len(alive_disk)], dtype=int)
+            enc_str = np.zeros([stripe_len, len(alive_disk)], dtype=int)
             for idx, i in enumerate(alive_disk):
                 with open(self.disk_path[i-1], 'rb') as f:
-                    enc_str[:, idx] = list(f.read())
+                    f.seek(start_p, 0)
+                    enc_str[:, idx] = list(f.read(stripe_len))
             # for idx, enc in enumerate(enc_str):
             #     enc_str[idx, :] = np.roll(enc, (idx % self.num_data_disk)) # read checksum from all disks
             print(enc_str)
@@ -131,13 +138,15 @@ class Controller(Monitor, RAID6):
         
         print(enc_str)
         for i in range(self.num_of_disk):
-            with open(self.disk_path[i], 'wb') as f:
+            with open(self.disk_path[i], 'ab+') as f:
+                # ipdb.set_trace()
+                start_p = f.tell()
                 byte_data = bytes(enc_str[:, i].tolist())
                 f.write(byte_data)
         
         self.files_info[self.filename] = [self.stripe_len, self.content_len]
         with open(self.files_info_path, 'a+') as f:
-            f.writelines([self.filename, ',',  str(self.stripe_len), ',', str(self.content_len), '\n'])
+            f.writelines([self.filename, ',', str(start_p), ',',  str(self.stripe_len), ',', str(self.content_len), '\n'])
     
     def splitter(self):
         """split the whole file into different disk partition
@@ -150,10 +159,10 @@ class Controller(Monitor, RAID6):
         print(self.__content_cache.shape)
     
     def combiner(self):
-        self.content_len = int(self.files_info[self.filename][1])
+        content_len = int(self.files_info[self.filename][2])
         print(self.__content_cache.shape)
         self.__content_cache = self.__content_cache.reshape(-1)
-        self.__content_cache = self.__content_cache[:self.content_len].tolist()
+        self.__content_cache = self.__content_cache[:content_len].tolist()
         print(self.__content_cache[:10])
     
     def process(self, mode, filename):
@@ -173,6 +182,9 @@ class Controller(Monitor, RAID6):
             self.write_to_disk()
         
         if mode == "read":
+            if filename not in self.files_info:
+                print("Fail to find {} in RAID6 disk.".format(filename))
+                return
             if self.num_check_disk < self.total_num_of_disk - sum(self.disk_status):
                 print("Critical Error! Data cannot be restored.")
                 return
@@ -183,18 +195,18 @@ class Controller(Monitor, RAID6):
     
 if __name__ == "__main__":
     # test case
-    # rd6 = RAID6(w=4, n=6, m=2)
-    # pw = rd6.encode(np.array([[13, 14, 15, 10, 11, 12]], dtype=int).T)
-    # print(rd6.decode(pw, [0, 1, 2, 4, 5, 7]).T)
+    rd6 = RAID6(w=4, n=6, m=2)
+    pw = rd6.encode(np.array([[13, 14, 15, 10, 11, 12]], dtype=int).T)
+    print(rd6.decode(pw, [0, 1, 2, 4, 5, 7]).T)
     
-    # rd6 = RAID6(w=8, n=6, m=2)
-    # pw = rd6.encode(np.array([[32, 12, 24, 47, 10, 22]], dtype=int).T)
-    # print(rd6.decode(pw, [0, 1, 2, 4, 5, 7]).T)
+    rd6 = RAID6(w=8, n=6, m=2)
+    pw = rd6.encode(np.array([[32, 12, 24, 47, 10, 22]], dtype=int).T)
+    print(rd6.decode(pw, [0, 1, 2, 4, 5, 7]).T)
     
-    # rd6 = RAID6(w=16, n=8, m=2)
-    # pw = rd6.encode(np.array([[543, 1231, 23425, 33, 765, 41435, 214, 27383]], dtype=int).T)
-    # print(rd6.decode(pw, [0, 3, 4, 5, 6, 7, 8, 9]).T)
+    rd6 = RAID6(w=16, n=8, m=2)
+    pw = rd6.encode(np.array([[543, 1231, 23425, 33, 765, 41435, 214, 27383]], dtype=int).T)
+    print(rd6.decode(pw, [0, 3, 4, 5, 6, 7, 8, 9]).T)
     
     cont = Controller()
-    # cont.process(mode="write", filename="colorbar_bi.png")
+    cont.process(mode="write", filename="colorbar_bi.png")
     cont.process(mode="read", filename="colorbar_bi.png")

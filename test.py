@@ -13,8 +13,8 @@ simu = Simulator()
 
 
 cont = Controller()
-filename = "colorbar_bi.png"
-# filename = "Project 1.2023.pdf"
+# filename = "colorbar_bi.png"
+filename = "Project 1.2023.pdf"
 # filename = "PureMagLocalization-ShenHongming.pptx"
-cont.process(mode="write", filename=filename)
-# cont.process(mode="read", filename=filename)
+# cont.process(mode="write", filename=filename)
+cont.process(mode="read", filename=filename)
