@@ -1,6 +1,7 @@
 import numpy as np
 import copy
 import ipdb
+import struct
 from core.src.GaloisField import GaloisField
 from core.src.Monitor import Monitor
 # from GaloisField import GaloisField
@@ -88,6 +89,7 @@ class Controller(Monitor, RAID6):
         Monitor.__init__(self)
         RAID6.__init__(self, w=int(8*self.chunk_size), n=self.num_data_disk, m=self.num_check_disk)
         self.__content_cache = []
+        self.pack_m = ['c', 'B', 'H', 'L', 'Q']
     
     def reset(self):
         self.__content_cache = []
@@ -104,15 +106,25 @@ class Controller(Monitor, RAID6):
                 data_chunk = f.read(self.chunk_size)
                 if not data_chunk:
                     break
-                self.__content_cache.append(int.from_bytes(data_chunk, "big"))
+                self.__content_cache.append(int.from_bytes(data_chunk, "little"))
                 
             # print(self.__content_cache)
             # print(len(self.__content_cache), max(self.__content_cache))
+            # data = f.read()
+            # if len(data) % self.chunk_size: byte_len = len(data) // self.chunk_size + 1
+            # else: byte_len = len(data) // self.chunk_size
+            # ipdb.set_trace()
+            
+            # self.__content_cache = struct.unpack('<'+str(byte_len)+self.pack_m[self.chunk_size], data)
             self.content_len = len(self.__content_cache)
     
     def write_to_system(self, path):
         with open(path, 'wb') as f:
-            byte_data = bytes(self.__content_cache)
+            # print(len(self.__content_cache)*self.chunk_size)
+            byte_data = struct.pack('<'+str(len(self.__content_cache))+self.pack_m[self.chunk_size], *self.__content_cache)
+            # ipdb.set_trace()
+            # byte_data = struct.unpack('<'+str(len(byte_data))+'B', byte_data)
+            # byte_data = bytes(self.__content_cache)
             f.write(byte_data)
     
     def read_from_disk(self):
@@ -123,7 +135,9 @@ class Controller(Monitor, RAID6):
             for idx in range(self.num_data_disk):
                 with open(self.disk_path[idx], 'rb') as f:
                     f.seek(start_p, 0)
-                    enc_str[:, idx] = list(f.read(stripe_len))     
+                    # enc_str[:, idx] = list(f.read(stripe_len))    
+                    byte_data = f.read(stripe_len * self.chunk_size) 
+                    enc_str[:, idx] = struct.unpack('<'+str(stripe_len)+self.pack_m[self.chunk_size], byte_data)
             # for idx, enc in enumerate(enc_str):
             #     enc_str[idx, :] = np.roll(enc, (idx % self.num_data_disk)) #
             
@@ -137,7 +151,9 @@ class Controller(Monitor, RAID6):
             for idx, i in enumerate(alive_disk):
                 with open(self.disk_path[i-1], 'rb') as f:
                     f.seek(start_p, 0)
-                    enc_str[:, idx] = list(f.read(stripe_len))
+                    byte_data = f.read(stripe_len * self.chunk_size)
+                    enc_str[:, idx] = struct.unpack('<'+str(stripe_len)+self.pack_m[self.chunk_size], byte_data)
+                    # enc_str[:, idx] = list(f.read(stripe_len))
             # for idx, enc in enumerate(enc_str):
             #     enc_str[idx, :] = np.roll(enc, (idx % self.num_data_disk)) # read checksum from all disks
             # print(enc_str)
@@ -152,9 +168,9 @@ class Controller(Monitor, RAID6):
         # print(enc_str)
         for i in range(self.total_num_of_disk):
             with open(self.disk_path[i], 'ab+') as f:
-                # ipdb.set_trace()
                 start_p = f.tell()
-                byte_data = bytes(enc_str[:, i].tolist())
+                byte_data = struct.pack('<'+str(len(enc_str[:, i]))+self.pack_m[self.chunk_size], *enc_str[:, i].tolist())
+                # byte_data = bytes(enc_str[:, i].tolist())
                 f.write(byte_data)
         
         self.files_info[self.filename] = [str(start_p), str(self.stripe_len), str(self.content_len)]
@@ -185,8 +201,9 @@ class Controller(Monitor, RAID6):
         for i in die_disk:
             with open(self.disk_path[i], 'ab+') as f:
                 # ipdb.set_trace()
-                start_p = f.tell()
-                byte_data = bytes(enc_str[:, i].tolist())
+                # start_p = f.tell()
+                byte_data = struct.pack('<'+str(len(enc_str[:, i]))+self.pack_m[self.chunk_size], *enc_str[:, i].tolist())
+                # byte_data = bytes(enc_str[:, i].tolist())
                 f.write(byte_data)
     
     def process(self, mode, filename):
@@ -200,7 +217,8 @@ class Controller(Monitor, RAID6):
                     print("File with same name exist.")
                     # ipdb.set_trace()
                     return [2, "File with same name exist."]
-                path = os.path.join(os.getcwd(), 'input_data', file)
+                path = os.path.join(os.getcwd(), 'input_data', file) # real-file
+                # path = os.path.join(os.getcwd(), 'test_data', file) # test-data
                 self.read_from_system(path)
                 self.splitter()
                 self.write_to_disk()

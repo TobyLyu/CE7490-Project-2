@@ -98,7 +98,7 @@ def config_database():
     
     disk_num = len(os.listdir(os.path.join(os.getcwd(), "storage")))
     config = sd.askstring("Input",
-                          prompt="\tYou totally have: {} Disks.\n\tPlease input number of:\n\tData_Disk,Check_Disk,Chunk_Size\n\t-> Int, no space\n\t-> Data_Disk+Check_Disk={}\n\t-> 1<=Chunk_Size<=4".format(disk_num, disk_num))
+                          prompt="\tYou totally have: {} Disks.\n\tPlease input number of:\n\n\tData_Disk,Check_Disk,Chunk_Size\n\n\t-> Int, no space\n\t-> Data_Disk+Check_Disk={}\n\t-> Chunk_Size in [1, 2]".format(disk_num, disk_num))
     if config == None or len(config.split(",")) != 3:
         mb.showerror(title="error",
                     message="Invalid input",
@@ -111,7 +111,7 @@ def config_database():
                      message="You must use {} disks.\n But your setting {}+{}!={}".format(disk_num, config[0], config[1], disk_num),
                      icon="error")
         return 1
-    if config[2] > 4 or config[2] < 1:
+    if config[2] not in [1, 2]:
         mb.showerror(title="error",
                      message="Chunk size shall between [1, 4], but your value is {}".format(config[2]),
                      icon="error")
@@ -185,7 +185,7 @@ def callback(evt):
 
 root=tk.Tk()
 root.title("Hardware Simulator")
-root.geometry("350x275")  
+root.geometry("800x400")  
 
 frame_lst = []
 for i in range(3):

@@ -4,3 +4,5 @@ input_data/
 storage/
 core/config/files.csv
 core/config/config.yml
+test_data/
+result*

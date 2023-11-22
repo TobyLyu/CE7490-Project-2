@@ -13,19 +13,23 @@ class GaloisField:
         self.max_mask = 2**w
         if self.w == 4:
             # x^4 + x + 1
-            self.prim_poly = 0b10011
-            self.gflog = np.zeros(self.max_mask)
-            self.gfilog = np.zeros(self.max_mask)            
+            self.prim_poly = 1<<4 + 1<<1 + 1<<0        
         elif self.w == 8:
             # x^8 + x^4 + x^3 + x^2 + 1
-            self.prim_poly = 0b100011101
-            self.gflog = np.zeros(self.max_mask, dtype=int)
-            self.gfilog = np.zeros(self.max_mask, dtype=int)
+            self.prim_poly = 1<<8 + 1<< 4 + 1<<3 + 1<<2 + 1<<1
         elif self.w == 16:
             # x^16 + x^12 + x^3 + x + 1
-            self.prim_poly = 0b10001000000001011
-            self.gflog = np.zeros(self.max_mask, dtype=int)
-            self.gfilog = np.zeros(self.max_mask, dtype=int)
+            self.prim_poly = 1<<16 + 1<<12 + 1<<3 + 1<<1 + 1<<0
+        elif self.w == 32:
+            # x^32 + x^22 + x^2 + x + 1
+            self.prim_poly = 1<<32 + 1<<22 + 1<<2 + 1<<1 + 1<<0
+        elif self.w == 64:
+            # x^64 + x^4 + x^3 + x + 1
+            self.prim_poly = 1<<64 + 1<<4 + 1<<3 + 1<<1 + 1<<0
+        else:
+            print("invalid w input")
+        self.gflog = np.zeros(self.max_mask)
+        self.gfilog = np.zeros(self.max_mask)
         self.gen_tables()
 
     def gen_tables(self):
