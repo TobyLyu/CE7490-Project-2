@@ -103,10 +103,6 @@ def read_file():
 
 def rebuild_file():
     global lbl_disp
-    if sum(cont.disk_status) == cont.total_num_of_disk:
-        lbl_disp.configure(text="Rest Assured! Your database is healthy!\n Nothing to rebuild.", 
-                           wraplength=200)
-        return
     
     lbl_disp.configure(text="No problem! Rebuilding it...", 
                        wraplength=200)
@@ -123,18 +119,20 @@ def callback(evt):
     elif name == "<rebuild>":
         root.after(50, rebuild_file)
 
-def popup_lose_error():
+def popup_lose_error(lose_num):
     global root
     global rebuild_choice
+    global cont
 
-    msg_box = mb.askquestion(title = "Rebuild",
-                             message="[ERROR!]\n You may lose one or more disk!\n DON'T PANIC.\n We can restore it! Do you want to proceed?",
-                             icon = 'warning',)
+    lost_disk = cont.disk_name[~cont.disk_status]
+    mb.showwarning(title = "Rebuild",
+                    message="\n\t{} Lost!\n\tDON'T PANIC.\n\tReplace the disk(s) and click <rebuild>".format(lost_disk),
+                    icon = 'warning')
     
-    if msg_box == 'yes':
-        rebuild_choice = True
-    else:
-        rebuild_choice = False
+    # if msg_box == 'yes':
+    #     rebuild_choice = True
+    # else:
+    rebuild_choice = False
 
 def popup_lose_disaster():
     # global quit
@@ -262,6 +260,7 @@ list_of_file(widget=lbx_sys, file_list=file_list)
 # list_of_file(widget=lbx_disk, file_list=file_list)
 
 rebuild_choice = True
+last_disk_num = cont.total_num_of_disk
 while True: # Only exits, because update cannot be used on a destroyed application
     err = cont.detect_storage()
     if err:
@@ -277,12 +276,15 @@ while True: # Only exits, because update cannot be used on a destroyed applicati
         cont.save_system_info()
         print("[Disaster Error] Sorry lah, your data have lost permanently!")
         break
-    elif sum(cont.disk_status) < cont.total_num_of_disk and rebuild_choice:
-        popup_lose_error() # this will pop up once even if more disk fail later
-        print("Disk {} failed! Place replace and rebuild it first!".format(cont.disk_name[~cont.disk_status]))
-        if rebuild_choice:
-            rebuild_file()
-    
+    # elif sum(cont.disk_status) < cont.total_num_of_disk and rebuild_choice:
+    elif sum(cont.disk_status) < last_disk_num:
+        lose_num = cont.total_num_of_disk - sum(cont.disk_status)
+        last_disk_num = sum(cont.disk_status)
+        popup_lose_error(lose_num) # this will pop up once even if more disk fail later
+        # print("Disk {} failed! Place replace and rebuild it first!".format(cont.disk_name[~cont.disk_status]))
+        # if rebuild_choice:
+        #     rebuild_file()
+    last_disk_num = sum(cont.disk_status)
     
     root.update()
     root.update_idletasks()

@@ -13,19 +13,19 @@ class GaloisField:
         self.max_mask = 2**w
         if self.w == 4:
             # x^4 + x + 1
-            self.prim_poly = 1<<4 + 1<<1 + 1<<0        
+            self.prim_poly = (1<<4) + (1<<1) + (1<<0)        
         elif self.w == 8:
             # x^8 + x^4 + x^3 + x^2 + 1
-            self.prim_poly = 1<<8 + 1<< 4 + 1<<3 + 1<<2 + 1<<1
+            self.prim_poly = (1<<8) + (1<<4) + (1<<3) + (1<<2) + (1<<0)
         elif self.w == 16:
             # x^16 + x^12 + x^3 + x + 1
-            self.prim_poly = 1<<16 + 1<<12 + 1<<3 + 1<<1 + 1<<0
+            self.prim_poly = (1<<16) + (1<<12) + (1<<3) + (1<<1) + (1<<0)
         elif self.w == 32:
             # x^32 + x^22 + x^2 + x + 1
-            self.prim_poly = 1<<32 + 1<<22 + 1<<2 + 1<<1 + 1<<0
+            self.prim_poly = (1<<32) + (1<<22) + (1<<2) + (1<<1) + (1<<0)
         elif self.w == 64:
             # x^64 + x^4 + x^3 + x + 1
-            self.prim_poly = 1<<64 + 1<<4 + 1<<3 + 1<<1 + 1<<0
+            self.prim_poly = (1<<64) + (1<<4) + (1<<3) + (1<<1) + (1<<0)
         else:
             print("invalid w input")
         self.gflog = np.zeros(self.max_mask)
@@ -41,7 +41,7 @@ class GaloisField:
             self.gfilog[log] = int(dec)
             dec <<= 1
             if(dec >= self.max_mask): dec = (dec ^ self.prim_poly) & (self.max_mask - 1)
-           
+        
     def add(self, a, b):
         """GF add
 
