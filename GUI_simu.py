@@ -183,45 +183,47 @@ def callback(evt):
         root.after(50, remove_disk)
         
 
-root=tk.Tk()
-root.title("Hardware Simulator")
-root.geometry("800x400")  
+if __name__ == '__main__':
 
-frame_lst = []
-for i in range(3):
-    root.columnconfigure(i, weight=1, minsize=75)
-    root.rowconfigure(i, weight=1, minsize=50)
-    for j in range(3):
-        frame_lst.append(tk.Frame(
-            master=root,
-            # relief=tk.RAISED,
-            borderwidth=1
-        ))
-        frame_lst[-1].grid(row=i, column=j, sticky="nsew")
+    root=tk.Tk()
+    root.title("Hardware Simulator")
+    root.geometry("800x400")  
 
-
-button1=tk.Button(frame_lst[0], text="Create Database")
-button1.bind("<Button-1>", callback)
-button1.pack(fill="both", expand="True")
-
-button2=tk.Button(frame_lst[1], text="RAID Setting")
-button2.bind("<Button-1>", callback)
-button2.pack(fill="both", expand="True")
-
-button3=tk.Button(frame_lst[2], text="Create Disk")
-button3.bind("<Button-1>", callback)
-button3.pack(fill="both", expand="True")
-
-button4=tk.Button(frame_lst[3], text="Erase Database")
-button4.bind("<Button-1>", callback)
-button4.pack(fill="both", expand="True")
-
-label1=tk.Label(frame_lst[4], relief="sunken")
-label1.pack(fill="both", expand="True")
-
-button5=tk.Button(frame_lst[5], text="Remove Disk")
-button5.bind("<Button-1>", callback)
-button5.pack(fill="both", expand="True")
+    frame_lst = []
+    for i in range(3):
+        root.columnconfigure(i, weight=1, minsize=75)
+        root.rowconfigure(i, weight=1, minsize=50)
+        for j in range(3):
+            frame_lst.append(tk.Frame(
+                master=root,
+                # relief=tk.RAISED,
+                borderwidth=1
+            ))
+            frame_lst[-1].grid(row=i, column=j, sticky="nsew")
 
 
-root.mainloop()
+    button1=tk.Button(frame_lst[0], text="Create Database")
+    button1.bind("<Button-1>", callback)
+    button1.pack(fill="both", expand="True")
+
+    button2=tk.Button(frame_lst[1], text="RAID Setting")
+    button2.bind("<Button-1>", callback)
+    button2.pack(fill="both", expand="True")
+
+    button3=tk.Button(frame_lst[2], text="Create Disk")
+    button3.bind("<Button-1>", callback)
+    button3.pack(fill="both", expand="True")
+
+    button4=tk.Button(frame_lst[3], text="Erase Database")
+    button4.bind("<Button-1>", callback)
+    button4.pack(fill="both", expand="True")
+
+    label1=tk.Label(frame_lst[4], relief="sunken")
+    label1.pack(fill="both", expand="True")
+
+    button5=tk.Button(frame_lst[5], text="Remove Disk")
+    button5.bind("<Button-1>", callback)
+    button5.pack(fill="both", expand="True")
+
+
+    root.mainloop()

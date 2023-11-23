@@ -6,8 +6,10 @@ from core.src.GaloisField import GaloisField
 from core.src.Monitor import Monitor
 # from GaloisField import GaloisField
 # from Monitor import Monitor
-# import struct
+from threading import Thread
+from multiprocessing import Process, Queue, Manager
 import os
+
 
 class RAID6(GaloisField):
     def __init__(self, w, n, m) -> None:
@@ -21,13 +23,15 @@ class RAID6(GaloisField):
         super().__init__(w = w)
         self.data_num = n
         self.check_num = m
+        self.disk_num = self.data_num + self.check_num
         self.F = np.zeros([m, n], dtype=int)
         for i in range(0, m):
             for j in range(1, n+1):
                 self.F[i, j-1] = self.pow(j, i)
         self.A = np.vstack([np.eye(n, dtype=int), self.F])
     
-    def encode(self, bit_str):
+    # def encode(self, bit_in, result = [None], index = 0):
+    def encode(self, bit_in, use_que, queue_in, queue_out):
         """encode the input bit string with checksum
 
         Args:
@@ -37,35 +41,74 @@ class RAID6(GaloisField):
             nparray: encoded output with checksum
         """
         
-        # ipdb.set_trace()
-        assert self.A.shape[1] == bit_str.shape[0]
-        bit_in = copy.deepcopy(bit_str)
+        # print(result)
+        if use_que: bit_in = queue_in.get()
+        if len(bit_in) == 0:
+            # result[index]  = []
+            if use_que: queue_out.put([])
+            return []
         
+        # ipdb.set_trace()
+        # print(bit_in)
+        assert self.A.shape[1] == bit_in.shape[1]
+        # bit_str = copy.deepcopy(bit_in)
+        bit_str = bit_in
         # this calculation is slow and think the above I matrix is not necessary
         # self.matrix_multiply(self.A, bit_in)
         # return self.matrix_multiply(self.A, bit_in)
         
         # so we only ccalculate the checksum bit only
-        check_bit = self.matrix_multiply(self.A[-self.check_num:, :], bit_in)
-        return np.hstack([bit_str.T, check_bit.T]).T
+        check_bit = self.matrix_multiply(self.A[-self.check_num:, :], bit_str.T).T
+        enc_str = np.hstack([bit_str, check_bit])
+        for idx, enc in enumerate(enc_str):
+            enc_str[idx, :] = np.roll(enc, -(idx % self.disk_num)) # save checksum into all disks
+        # result[index] = enc_str
+        if use_que: queue_out.put(enc_str)
+        # return np.hstack([bit_str.T, check_bit.T]).T
+        return enc_str
         
     
-    def decode(self, bit_str):
+    # def decode(self, bit_in, disk_status, result = [None], index = 0):
+    def decode(self,  bit_in, disk_status, use_que, queue_in, queue_out):
         
-        assert bit_str.shape[0] == self.A.shape[1]
-        # print(self.A[:self.data_num, :])
-        A_i = self.matrix_inverse(self.A[:self.data_num, :])
-        return self.matrix_multiply(A_i, bit_str)
-    
-    def cal_A_i(self, num_disk, num_data, disk_status):
-        self.A_i_lst = []
-        for i in range(num_disk):
-            roll_n = i % num_disk
+        if use_que: [bit_in, disk_status] = queue_in.get()
+        if len(bit_in) == 0:
+            # result[index]  = []
+            if use_que: queue_out.put([])
+            return []
+        
+        # print(bit_in.shape[0])
+        
+        bit_str = copy.deepcopy(bit_in)
+        enc_str = np.zeros([bit_str.shape[0], self.num_data_disk], dtype=int)
+        for idx, enc in enumerate(bit_str):
+            roll_n = idx % self.total_num_of_disk
             # ipdb.set_trace()
-            self.A_i_lst.append(self.matrix_inverse(self.A[np.roll(disk_status, roll_n), :][:num_data, :]))
+            enc_str[idx, :] = np.roll(bit_str[idx, :], roll_n)[np.roll(disk_status, roll_n)][:self.data_num]
+            
+            # bit_str[idx, :] = np.roll(enc, (idx % self.disk_num)) # save checksum into all disks
+
+        
+        if all(disk_status):
+            # result[index]  = enc_str
+            pass
+        else:
+            enc_str = self.restore(enc_str)
+        
+        # result[index] = self.restore(enc_str)
+        # result[index] = bit_str
+        if use_que: queue_out.put(enc_str)
+        return enc_str
+    
+    def cal_A_i(self, disk_status):
+        self.A_i_lst = []
+        for i in range(self.disk_num):
+            roll_n = i % self.disk_num
+            # ipdb.set_trace()
+            self.A_i_lst.append(self.matrix_inverse(self.A[np.roll(disk_status, roll_n), :][:self.data_num, :]))
         
     
-    def restore(self, bit_str, disk_num, data_num):
+    def restore(self, bit_in):
         """decode the input bit string from data or checksum
 
         Args:
@@ -77,17 +120,22 @@ class RAID6(GaloisField):
         """
         # ipdb.set_trace()
         # assert bit_str.shape[0] == len(use_disk)
-        assert bit_str.shape[0] == self.A.shape[1]
         # if type(use_disk) == list:
         #     use_disk = np.array(use_disk, dtype = int)
         # use_disk -= 1
         # A_i = self.matrix_inverse(self.A[use_disk, :])
         # return self.matrix_multiply(A_i, bit_str)
-        output = np.zeros([data_num, bit_str.shape[1]], dtype=int)
-        for i in range(bit_str.shape[1]):
-            roll_n = i % disk_num
+        
+        bit_str = bit_in
+        
+        assert bit_str.shape[1] == self.A.shape[1]
+        
+        output = np.zeros([bit_str.shape[0], self.data_num], dtype=int)
+        for i in range(bit_str.shape[0]):
+            roll_n = i % self.disk_num
             # ipdb.set_trace()
-            output[:, i] = self.matrix_multiply(self.A_i_lst[roll_n], bit_str[:, i].reshape(-1, 1)).reshape(-1)
+            output[i, :] = self.matrix_multiply(self.A_i_lst[roll_n], bit_str[i, :].reshape(-1, 1)).reshape(-1)
+        
         return output
         
     
@@ -102,6 +150,8 @@ class Controller(Monitor, RAID6):
         RAID6.__init__(self, w=int(8*self.chunk_size), n=self.num_data_disk, m=self.num_check_disk)
         self.__content_cache = []
         self.pack_m = ['c', 'B', 'H', 'L', 'Q']
+        self.thread_num = 16
+        self.block_size_thre = 31250
     
     def reset(self):
         self.__content_cache = []
@@ -143,43 +193,9 @@ class Controller(Monitor, RAID6):
     def read_from_disk(self):
         start_p = int(self.files_info[self.filename][0])
         stripe_len = int(self.files_info[self.filename][1])
-        # if all(self.disk_status):
-        #     enc_str = np.zeros([stripe_len, self.num_data_disk], dtype=int)
-        #     for idx in range(self.num_data_disk):
-        #         with open(self.disk_path[idx], 'rb') as f:
-        #             f.seek(start_p, 0)
-        #             # enc_str[:, idx] = list(f.read(stripe_len))    
-        #             byte_data = f.read(stripe_len * self.chunk_size) 
-        #             enc_str[:, idx] = struct.unpack('<'+str(stripe_len)+self.pack_m[self.chunk_size], byte_data)
 
-        #     enc_str = np.zeros([stripe_len, self.total_num_of_disk], dtype=int)
-        #     for idx in range(self.num_data_disk):
-        #         with open(self.disk_path[idx], 'rb') as f:
-        #             f.seek(start_p, 0)
-        #             # enc_str[:, idx] = list(f.read(stripe_len))    
-        #             byte_data = f.read(stripe_len * self.chunk_size) 
-        #             enc_str[:, idx] = struct.unpack('<'+str(stripe_len)+self.pack_m[self.chunk_size], byte_data)
-        #     # for idx, enc in enumerate(enc_str):
-            
-        #     # for idx, enc in enumerate(enc_str):
-        #     #     enc_str[idx, :] = np.roll(enc, (idx % self.num_data_disk)) #
-            
-        #     # due to matrix multiply is slow, we do not decode if disk is healthy
-        #     # self.__content_cache = self.decode(enc_str.T).T
-        #     self.__content_cache = enc_str[:, :self.num_data_disk]
-        # else:
-            # disk_list = np.arange(1, self.total_num_of_disk+1)
-            # alive_disk = disk_list[self.disk_status][:self.num_data_disk]
-            # enc_str = np.zeros([stripe_len, len(alive_disk)], dtype=int)
-            # for idx, i in enumerate(alive_disk):
-            #     with open(self.disk_path[i-1], 'rb') as f:
-            #         f.seek(start_p, 0)
-            #         byte_data = f.read(stripe_len * self.chunk_size)
-            #         enc_str[:, idx] = struct.unpack('<'+str(stripe_len)+self.pack_m[self.chunk_size], byte_data)
-            # self.__content_cache = self.restore(enc_str.T, alive_disk).T
-
-        tmp_str = np.zeros([stripe_len, self.total_num_of_disk], dtype=int)
-        enc_str = np.zeros([stripe_len, self.num_data_disk], dtype=int)
+        enc_str = np.zeros([stripe_len, self.total_num_of_disk], dtype=int)
+        # enc_str = np.zeros([stripe_len, self.num_data_disk], dtype=int)
         for idx in range(self.total_num_of_disk):
             if not self.disk_status[idx]:
                 continue
@@ -188,27 +204,88 @@ class Controller(Monitor, RAID6):
                     f.seek(start_p, 0)
                     # enc_str[:, idx] = list(f.read(stripe_len))    
                     byte_data = f.read(stripe_len * self.chunk_size) 
-                    tmp_str[:, idx] = struct.unpack('<'+str(stripe_len)+self.pack_m[self.chunk_size], byte_data)            
-        for idx in range(stripe_len):
-            roll_n = idx % self.total_num_of_disk
-            # ipdb.set_trace()
-            enc_str[idx, :] = np.roll(tmp_str[idx, :], roll_n)[np.roll(self.disk_status, roll_n)][:self.num_data_disk]
+                    # print(len(byte_data))
+                    enc_str[:, idx] = struct.unpack('<'+str(stripe_len)+self.pack_m[self.chunk_size], byte_data)            
+        # for idx in range(stripe_len):
+        #     roll_n = idx % self.total_num_of_disk
+        #     # ipdb.set_trace()
+        #     enc_str[idx, :] = np.roll(tmp_str[idx, :], roll_n)[np.roll(self.disk_status, roll_n)][:self.num_data_disk]
             
         # print(enc_str)
-        if all(self.disk_status):
-            self.__content_cache = enc_str
+        # if all(self.disk_status):
+        #     self.__content_cache = enc_str
+        # else:
+
+        # print(enc_str.shape)
+
+        # ipdb.set_trace()
+        if len(enc_str) % (self.thread_num * self.total_num_of_disk) == 0:
+            block_size = stripe_len // (self.thread_num * self.total_num_of_disk)
+            block_size = block_size * self.total_num_of_disk
         else:
-            self.__content_cache = self.restore(enc_str.T, self.total_num_of_disk, self.num_data_disk).T
+            block_size = stripe_len // (self.thread_num * self.total_num_of_disk) + 1
+            block_size = block_size * self.total_num_of_disk
+        # print(block_size)
+        if block_size < self.block_size_thre:
+            self.__content_cache = self.decode(enc_str, self.disk_status, False, "", "")
+        else:
+            threads = [None] * self.thread_num
+            results = [None] * self.thread_num
+            queue_in = [Manager().Queue()] * self.thread_num
+            queue_out = [Manager().Queue()] * self.thread_num
+            for i in range(self.thread_num):
+                block = enc_str[block_size*i:min(enc_str.shape[0], block_size*(i+1)), :]
+                # results[i] = ShareableList([" "*block.nbytes/block.size for _ in range(block.size)])
+                # threads[i] = Process(target=self.decode, args=(enc_str[block_size*i:min(enc_str.shape[0], block_size*(i+1)), :], 
+                                                            # self.disk_status, results[i], i, ))
+                threads[i] = Process(target=self.decode, args=("", "", True, queue_in[i],queue_out[i]))
+                queue_in[i].put([block, self.disk_status ])
+                threads[i].start()
             
+            
+            for i in range(self.thread_num):
+                results[i] = queue_out[i].get()
+                threads[i].join()
+                
+            self.__content_cache = np.vstack([result for result in results if len(result)])
+        
         # print(self.__content_cache)
     
     def write_to_disk(self):
-        enc_str = self.encode(self.__content_cache.T).T
+        
+        # results = [None] * self.thread_num
+
+        if not len(self.__content_cache) % (self.thread_num * self.total_num_of_disk):
+            block_size = self.stripe_len // (self.thread_num * self.total_num_of_disk)
+            block_size = block_size * self.total_num_of_disk
+        else:
+            block_size = self.stripe_len // (self.thread_num * self.total_num_of_disk) + 1
+            block_size = block_size * self.total_num_of_disk
+        if block_size < self.block_size_thre:
+            enc_str = self.encode(self.__content_cache, False, "", "")
+        else:
+            threads = [None] * self.thread_num
+            results = [None] * self.thread_num
+            queue_in = [Manager().Queue()] * self.thread_num
+            queue_out = [Manager().Queue()] * self.thread_num
+            for i in range(self.thread_num):
+                block = self.__content_cache[block_size*i:min(self.__content_cache.shape[0], block_size*(i+1)), :]
+                threads[i] = Process(target=self.encode, args=("", True, queue_in[i], queue_out[i]))
+                queue_in[i].put(block)
+                threads[i].start()
+            
+            
+            for i in range(self.thread_num):
+                results[i] = queue_out[i].get()
+                threads[i].join()
+                
+            enc_str = np.vstack([result for result in results if len(result)])
+
+        
+        # print(len(enc_str))
+        # enc_str = self.encode(self.__content_cache.T).T
         # print(enc_str)
 
-        for idx, enc in enumerate(enc_str):
-            enc_str[idx, :] = np.roll(enc, -(idx % self.total_num_of_disk)) # save checksum into all disks
-        
         
         # print(enc_str)
         for i in range(self.total_num_of_disk):
@@ -216,6 +293,7 @@ class Controller(Monitor, RAID6):
                 start_p = f.tell()
                 byte_data = struct.pack('<'+str(len(enc_str[:, i]))+self.pack_m[self.chunk_size], *enc_str[:, i].tolist())
                 # byte_data = bytes(enc_str[:, i].tolist())
+                # print(len(byte_data))
                 f.write(byte_data)
         
         self.files_info[self.filename] = [str(start_p), str(self.stripe_len), str(self.content_len)]
@@ -225,10 +303,14 @@ class Controller(Monitor, RAID6):
     def splitter(self):
         """split the whole file into different disk partition
         """
-        # print(self.__content_cache[:10])
-        self.stripe_len = self.content_len // self.num_data_disk + 1
+        if self.content_len % self.num_data_disk == 0:
+            self.stripe_len = self.content_len // self.num_data_disk
+        else:
+            self.stripe_len = self.content_len // self.num_data_disk + 1
         self.__content_cache = self.__content_cache + [0] * (self.stripe_len * self.num_data_disk - self.content_len)
         self.__content_cache = np.asarray(self.__content_cache).astype(int).reshape([self.stripe_len, self.num_data_disk])
+        # print(self.__content_cache)
+        
         # print(self.__content_cache)
         
         # print(self.__content_cache.shape)
@@ -236,21 +318,54 @@ class Controller(Monitor, RAID6):
     def combiner(self):
         content_len = int(self.files_info[self.filename][2])
         # print(self.__content_cache.shape)
+        # print(self.__content_cache)
         self.__content_cache = self.__content_cache.reshape(-1)
         self.__content_cache = self.__content_cache[:content_len].tolist()
         # print(self.__content_cache[:10])
     
     def rebuild_disk(self):
-        enc_str = self.encode(self.__content_cache.T).T
+
+        # results = [None] * self.thread_num
+        start_p = int(self.files_info[self.filename][0])
+        stripe_len = int(self.files_info[self.filename][1])
         
-        for idx, enc in enumerate(enc_str):
-            enc_str[idx, :] = np.roll(enc, -(idx % self.total_num_of_disk)) # save checksum into all disks
+        if not len(self.__content_cache) % (self.thread_num * self.total_num_of_disk):
+            block_size = stripe_len // (self.thread_num * self.total_num_of_disk)
+            block_size = block_size * self.total_num_of_disk
+        else:
+            block_size = stripe_len // (self.thread_num * self.total_num_of_disk) + 1
+            block_size = block_size * self.total_num_of_disk
+        if block_size < self.block_size_thre:
+            enc_str = self.encode(self.__content_cache, False, "", "")
+        else:
+            threads = [None] * self.thread_num
+            results = [None] * self.thread_num
+            queue_in = [Manager().Queue()] * self.thread_num
+            queue_out = [Manager().Queue()] * self.thread_num
+            for i in range(self.thread_num):
+                block = self.__content_cache[block_size*i:min(self.__content_cache.shape[0], block_size*(i+1)), :]
+                threads[i] = Process(target=self.encode, args=("", True, queue_in[i], queue_out[i]))
+                queue_in[i].put(block)
+                threads[i].start()
+            
+            
+            for i in range(self.thread_num):
+                results[i] = queue_out[i].get()
+                threads[i].join()
+                
+            enc_str = np.vstack([result for result in results if len(result)])
+
+        # enc_str = self.encode(self.__content_cache)
+        
+        # for idx, enc in enumerate(enc_str):
+        #     enc_str[idx, :] = np.roll(enc, -(idx % self.total_num_of_disk)) # save checksum into all disks
         
         die_disk = np.arange(0, self.total_num_of_disk)[~self.disk_status]
         for i in die_disk:
             with open(self.disk_path[i], 'ab+') as f:
                 # ipdb.set_trace()
                 # start_p = f.tell()
+                f.seek(start_p)
                 byte_data = struct.pack('<'+str(len(enc_str[:, i]))+self.pack_m[self.chunk_size], *enc_str[:, i].tolist())
                 # byte_data = bytes(enc_str[:, i].tolist())
                 f.write(byte_data)
@@ -284,7 +399,7 @@ class Controller(Monitor, RAID6):
                     print("Critical Error! Data cannot be restored.")
                     return [4, "Critical Error! Data cannot be restored."]
                 if sum(self.disk_status) < self.total_num_of_disk:
-                    self.cal_A_i(self.total_num_of_disk, self.num_data_disk, self.disk_status)
+                    self.cal_A_i(self.disk_status)
                 path = os.path.join(os.getcwd(), 'output_data', file)
                 self.read_from_disk()
                 self.combiner()
@@ -297,7 +412,7 @@ class Controller(Monitor, RAID6):
             if sum(self.disk_on) != self.total_num_of_disk:
                 missing_disk = self.disk_name[~self.disk_on]
                 return[5, "\n\tPlease replace the fail disk \n\t{}".format(missing_disk)]
-            self.cal_A_i(self.total_num_of_disk, self.num_data_disk, self.disk_status)
+            self.cal_A_i(self.disk_status)
             for file in filename:
                 self.reset()
                 self.filename = file

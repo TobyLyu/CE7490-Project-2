@@ -21,7 +21,7 @@ def create_dat(file_size):
 
 
 if __name__ == "__main__":
-    size_list = [2**i for i in [0, 5, 10, 15, 20, 22]]
+    size_list = [2**i for i in range(0,25)]
     path = os.path.join(os.getcwd(), "test_data")
     if not os.path.exists(path):
         os.mkdir(path)
@@ -32,13 +32,13 @@ if __name__ == "__main__":
     file_list.sort()
     
     simu = Simulator()
-    simu.erase_database()
     
-    f = open(os.path.join(os.getcwd(), "result.csv"), "w+")
-    f.writelines(["chunk_size, file_name, write, read, rebuild\n"])
+    with open(os.path.join(os.getcwd(), "result.csv"), "w+") as f:
+        f.writelines(["chunk_size, file_name, write, read, rebuild\n"])
     
     for chunk_size in [1, 2]:
         for file in file_list:
+            simu.erase_database()
             simu.create_database(8)
             simu.set_system_info(8, 6, 2, chunk_size=chunk_size)
             cont = Controller()
@@ -62,12 +62,11 @@ if __name__ == "__main__":
             start = perf_counter()
             cont.process(mode="rebuild", filename=[file])
             rebuild_time = perf_counter() - start
-            
-            f.writelines([str(chunk_size), ",", 
+            with open(os.path.join(os.getcwd(), "result.csv"), "a+") as f:
+                f.writelines([str(chunk_size), ",", 
                         file[2:-4], ",", 
                         str(write_time), ",", 
                         str(read_time), ",", 
                         str(rebuild_time), "\n"])
-            simu.erase_database()
             
-    f.close()
+    # f.close()

@@ -158,138 +158,138 @@ def on_quit():
     quit = True
 
 
+if __name__ == '__main__':
 
+    if not os.path.exists(os.path.join(os.getcwd(), 'storage')) or len(os.listdir(os.path.join(os.getcwd(), 'storage'))) == 0:
+        mb.showerror(title="error",
+                    message="Please create disk first!",
+                    icon="error")
+        exit()
 
-if not os.path.exists(os.path.join(os.getcwd(), 'storage')) or len(os.listdir(os.path.join(os.getcwd(), 'storage'))) == 0:
-    mb.showerror(title="error",
-                 message="Please create disk first!",
-                 icon="error")
-    exit()
+    if not os.path.exists(os.path.join(os.getcwd(), 'core/config/config.yml')):
+        mb.showerror(title="error",
+                    message="Database configuration file not found.\nPlease configure the database first!",
+                    icon="error")
+        exit()
 
-if not os.path.exists(os.path.join(os.getcwd(), 'core/config/config.yml')):
-    mb.showerror(title="error",
-                 message="Database configuration file not found.\nPlease configure the database first!",
-                 icon="error")
-    exit()
+    quit = False
+    root = tk.Tk()
+    root.title("RAID Controller")
+    root.geometry("800x400")
+    root.protocol("WM_DELETE_WINDOW", on_quit)
 
-quit = False
-root = tk.Tk()
-root.title("RAID Controller")
-root.geometry("800x400")
-root.protocol("WM_DELETE_WINDOW", on_quit)
+    cont = Controller()
 
-cont = Controller()
+    frame_disk = tk.Frame(master=root)
+    frame_disk.pack(fill="both", side="left", expand="True")
 
-frame_disk = tk.Frame(master=root)
-frame_disk.pack(fill="both", side="left", expand="True")
+    frame_disk_sub = tk.Frame(master=frame_disk,
+                            height=30)
+    frame_disk_sub.pack(fill="x", side="top", expand="False")
+    lbl_sys_info = tk.Label(master=frame_disk_sub, text="File in RAID6 Disk")
+    lbl_sys_info.pack(side="left", fill="x", expand="True")
+    btn_sys_info = tk.Button(master=frame_disk_sub, text="Refresh")
+    btn_sys_info.bind("<Button-1>", refresh_disk)
+    btn_sys_info.pack(side="right", fill="x", expand="True")
 
-frame_disk_sub = tk.Frame(master=frame_disk,
-                         height=30)
-frame_disk_sub.pack(fill="x", side="top", expand="False")
-lbl_sys_info = tk.Label(master=frame_disk_sub, text="File in RAID6 Disk")
-lbl_sys_info.pack(side="left", fill="x", expand="True")
-btn_sys_info = tk.Button(master=frame_disk_sub, text="Refresh")
-btn_sys_info.bind("<Button-1>", refresh_disk)
-btn_sys_info.pack(side="right", fill="x", expand="True")
-
-lbx_disk = tk.Listbox(master=frame_disk, selectmode=EXTENDED, exportselection=False)
-lbx_disk.bind("<<ListboxSelect>>", read_select)
-# lbx_disk.bind("<Button-1>", read_select)
-lbx_disk.pack(fill="both", expand="True")
-file_list = read_file_list()
-list_of_file(widget=lbx_disk, file_list=file_list)
-
-
-
-frame_op = tk.Frame(master=root)
-frame_op.pack(fill="both", side="left", expand="True")
-
-frame_disp = tk.Frame(master=frame_op)
-frame_disp.pack(fill="both", side="top", expand="True")
-lbl_disp = tk.Label(master=frame_disp, 
-                    # text = "Status:", 
-                    relief="sunken")
-lbl_disp.pack(fill="both", expand="True")
-
-frame_btn = tk.Frame(master=frame_op)
-frame_btn.pack(fill="both", side="bottom", expand="True")
-btn_save = tk.Button(master=frame_btn,
-                   text="save\n<-------",
-                   height=3)
-btn_save.bind("<Button-1>", callback)
-btn_save.pack(fill="x", side="top", expand="True")
-btn_read = tk.Button(master=frame_btn,
-                   text="read\n------->",
-                   height=3)
-btn_read.bind("<Button-1>", callback)
-btn_read.pack(fill="x", side="top", expand="True")
-btn_read = tk.Button(master=frame_btn,
-                   text="<rebuild>",
-                   height=3)
-btn_read.bind("<Button-1>", callback)
-btn_read.pack(fill="x", side="top", expand="True")
+    lbx_disk = tk.Listbox(master=frame_disk, selectmode=EXTENDED, exportselection=False)
+    lbx_disk.bind("<<ListboxSelect>>", read_select)
+    # lbx_disk.bind("<Button-1>", read_select)
+    lbx_disk.pack(fill="both", expand="True")
+    file_list = read_file_list()
+    list_of_file(widget=lbx_disk, file_list=file_list)
 
 
 
+    frame_op = tk.Frame(master=root)
+    frame_op.pack(fill="both", side="left", expand="True")
+
+    frame_disp = tk.Frame(master=frame_op)
+    frame_disp.pack(fill="both", side="top", expand="True")
+    lbl_disp = tk.Label(master=frame_disp, 
+                        # text = "Status:", 
+                        relief="sunken")
+    lbl_disp.pack(fill="both", expand="True")
+
+    frame_btn = tk.Frame(master=frame_op)
+    frame_btn.pack(fill="both", side="bottom", expand="True")
+    btn_save = tk.Button(master=frame_btn,
+                    text="save\n<-------",
+                    height=3)
+    btn_save.bind("<Button-1>", callback)
+    btn_save.pack(fill="x", side="top", expand="True")
+    btn_read = tk.Button(master=frame_btn,
+                    text="read\n------->",
+                    height=3)
+    btn_read.bind("<Button-1>", callback)
+    btn_read.pack(fill="x", side="top", expand="True")
+    btn_read = tk.Button(master=frame_btn,
+                    text="<rebuild>",
+                    height=3)
+    btn_read.bind("<Button-1>", callback)
+    btn_read.pack(fill="x", side="top", expand="True")
 
 
-frame_sys = tk.Frame(master=root)
-frame_sys.pack(fill="both", side="left", expand="True")
-
-frame_sys_sub = tk.Frame(master=frame_sys,
-                         height=30)
-frame_sys_sub.pack(fill="x", side="top", expand="False")
-lbl_sys_info = tk.Label(master=frame_sys_sub, text="File in System")
-lbl_sys_info.pack(side="left", fill="x", expand="True")
-btn_sys_info = tk.Button(master=frame_sys_sub, text="Refresh")
-btn_sys_info.bind("<Button-1>", refresh_sys)
-btn_sys_info.pack(side="right", fill="x", expand="True")
-
-lbx_sys = tk.Listbox(master=frame_sys, selectmode=EXTENDED, exportselection=False)
-lbx_sys.bind("<<ListboxSelect>>", write_select)
-# lbx_sys.bind("<ButtonPress-1>", write_select)
-lbx_sys.pack(side="top", fill="both", expand="True")
-file_list = get_file_list()
-list_of_file(widget=lbx_sys, file_list=file_list)
 
 
-# # lbx_disk.bind("<Double-Button>", lambda x: openfolders(lbx_sys.get(lbx_sys.curselection())))
-# lbx_disk.bind("<<ListboxSelect>>", oneselect)
-# lbx_disk.pack(fill="both", expand="True")
-# file_list = read_file_list()
-# list_of_file(widget=lbx_disk, file_list=file_list)
 
-rebuild_choice = True
-last_disk_num = cont.total_num_of_disk
-while True: # Only exits, because update cannot be used on a destroyed application
-    err = cont.detect_storage()
-    if err:
-        popup_lose_disaster()
-        root.destroy()
-        # cont.save_system_info()
-        print("[Disaster Error] Hey! What happened?")
-        break
-    
-    if sum(cont.disk_status) < cont.total_num_of_disk - cont.num_check_disk:
-        popup_lose_disaster()
-        root.destroy()
-        cont.save_system_info()
-        print("[Disaster Error] Sorry lah, your data have lost permanently!")
-        break
-    # elif sum(cont.disk_status) < cont.total_num_of_disk and rebuild_choice:
-    elif sum(cont.disk_status) < last_disk_num:
-        lose_num = cont.total_num_of_disk - sum(cont.disk_status)
+    frame_sys = tk.Frame(master=root)
+    frame_sys.pack(fill="both", side="left", expand="True")
+
+    frame_sys_sub = tk.Frame(master=frame_sys,
+                            height=30)
+    frame_sys_sub.pack(fill="x", side="top", expand="False")
+    lbl_sys_info = tk.Label(master=frame_sys_sub, text="File in System")
+    lbl_sys_info.pack(side="left", fill="x", expand="True")
+    btn_sys_info = tk.Button(master=frame_sys_sub, text="Refresh")
+    btn_sys_info.bind("<Button-1>", refresh_sys)
+    btn_sys_info.pack(side="right", fill="x", expand="True")
+
+    lbx_sys = tk.Listbox(master=frame_sys, selectmode=EXTENDED, exportselection=False)
+    lbx_sys.bind("<<ListboxSelect>>", write_select)
+    # lbx_sys.bind("<ButtonPress-1>", write_select)
+    lbx_sys.pack(side="top", fill="both", expand="True")
+    file_list = get_file_list()
+    list_of_file(widget=lbx_sys, file_list=file_list)
+
+
+    # # lbx_disk.bind("<Double-Button>", lambda x: openfolders(lbx_sys.get(lbx_sys.curselection())))
+    # lbx_disk.bind("<<ListboxSelect>>", oneselect)
+    # lbx_disk.pack(fill="both", expand="True")
+    # file_list = read_file_list()
+    # list_of_file(widget=lbx_disk, file_list=file_list)
+
+    rebuild_choice = True
+    last_disk_num = cont.total_num_of_disk
+    while True: # Only exits, because update cannot be used on a destroyed application
+        err = cont.detect_storage()
+        if err:
+            popup_lose_disaster()
+            root.destroy()
+            # cont.save_system_info()
+            print("[Disaster Error] Hey! What happened?")
+            break
+        
+        if sum(cont.disk_status) < cont.total_num_of_disk - cont.num_check_disk:
+            popup_lose_disaster()
+            root.destroy()
+            cont.save_system_info()
+            print("[Disaster Error] Sorry lah, your data have lost permanently!")
+            break
+        # elif sum(cont.disk_status) < cont.total_num_of_disk and rebuild_choice:
+        elif sum(cont.disk_status) < last_disk_num:
+            lose_num = cont.total_num_of_disk - sum(cont.disk_status)
+            last_disk_num = sum(cont.disk_status)
+            popup_lose_error(lose_num) # this will pop up once even if more disk fail later
+            # print("Disk {} failed! Place replace and rebuild it first!".format(cont.disk_name[~cont.disk_status]))
+            # if rebuild_choice:
+            #     rebuild_file()
         last_disk_num = sum(cont.disk_status)
-        popup_lose_error(lose_num) # this will pop up once even if more disk fail later
-        # print("Disk {} failed! Place replace and rebuild it first!".format(cont.disk_name[~cont.disk_status]))
-        # if rebuild_choice:
-        #     rebuild_file()
-    last_disk_num = sum(cont.disk_status)
-    
-    root.update()
-    root.update_idletasks()
-    time.sleep(0.05)
-    if quit:
-        # root.destroy()
-        cont.save_system_info()
-        break
+        
+        root.update()
+        root.update_idletasks()
+        time.sleep(0.05)
+        if quit:
+            # root.destroy()
+            cont.save_system_info()
+            break
