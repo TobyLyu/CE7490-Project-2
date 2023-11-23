@@ -104,7 +104,7 @@ def config_database():
     
     disk_num = len(os.listdir(os.path.join(os.getcwd(), "storage")))
     config = sd.askstring("Input",
-                          prompt="\tYou totally have: {} Disks.\n\tPlease input number of:\n\n\tData_Disk,Check_Disk,Chunk_Size\n\n\t-> Int, no space\n\t-> Data_Disk+Check_Disk={}\n\t-> Chunk_Size in [1, 2]".format(disk_num, disk_num))
+                          prompt="\tYou totally have: {} Disks.\n\tPlease input number of:\n\n\tData_Disk,Check_Disk,Word_Length\n\n\t-> Int, no space\n\t-> Data_Disk+Check_Disk={}\n\t-> Word_Length in [1, 2]".format(disk_num, disk_num))
     # read user input and check validity
     # config: [data_num, parity_num, chunk_size]
     if config == None or len(config.split(",")) != 3:
@@ -121,7 +121,7 @@ def config_database():
         return 1
     if config[2] not in [1, 2]:
         mb.showerror(title="error",
-                     message="Chunk size shall between [1, 4], but your value is {}".format(config[2]),
+                     message="Word Length shall be [1, 2], but your value is {}".format(config[2]),
                      icon="error")
         return 1
     
