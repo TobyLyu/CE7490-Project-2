@@ -7,3 +7,6 @@ core/config/config.yml
 test_data/
 result*
 *mat
+fig/
+*m
+*asv

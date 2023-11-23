@@ -11,6 +11,8 @@ import ipdb
 simu = Simulator()
 
 def erase_database():
+    """erase the whole database and remove all the folders
+    """
     global simu
     global label1
     # to remove the whole database
@@ -34,6 +36,8 @@ def erase_database():
         return 1
 
 def create_database():
+    """create the disks
+    """
     global simu
     global label1
     path = os.path.join(os.getcwd(), "storage")
@@ -67,6 +71,8 @@ def create_database():
     return 0
 
 def config_database():
+    """configure the RAID6
+    """
     global simu
     if os.path.exists(os.path.join(os.getcwd(), 'core/config/config.yml')):
         ans = mb.askquestion(title="warning",
@@ -99,6 +105,8 @@ def config_database():
     disk_num = len(os.listdir(os.path.join(os.getcwd(), "storage")))
     config = sd.askstring("Input",
                           prompt="\tYou totally have: {} Disks.\n\tPlease input number of:\n\n\tData_Disk,Check_Disk,Chunk_Size\n\n\t-> Int, no space\n\t-> Data_Disk+Check_Disk={}\n\t-> Chunk_Size in [1, 2]".format(disk_num, disk_num))
+    # read user input and check validity
+    # config: [data_num, parity_num, chunk_size]
     if config == None or len(config.split(",")) != 3:
         mb.showerror(title="error",
                     message="Invalid input",
@@ -126,6 +134,8 @@ def config_database():
     return 0
     
 def create_disk():
+    """create one disk with designate label
+    """
     global simu
     disk_id = sd.askinteger(title="Input",
                             prompt="Assign the disk an ID [int]:",
@@ -148,6 +158,8 @@ def create_disk():
     return 0
 
 def remove_disk():
+    """delete a disk with designated label
+    """
     disk_id = sd.askinteger(title="Input",
                         prompt="Identify the disk an ID [int]:",
                         initialvalue=1)
@@ -169,6 +181,8 @@ def remove_disk():
     return 0
     
 def callback(evt):
+    """fake callback to improve GUI responsiveness
+    """
     global root
     name = evt.widget.cget('text')
     if name == "Create Database":
@@ -189,6 +203,7 @@ if __name__ == '__main__':
     root.title("Hardware Simulator")
     root.geometry("800x400")  
 
+    # create grid
     frame_lst = []
     for i in range(3):
         root.columnconfigure(i, weight=1, minsize=75)
@@ -201,26 +216,33 @@ if __name__ == '__main__':
             ))
             frame_lst[-1].grid(row=i, column=j, sticky="nsew")
 
+    ###### create elements ######
 
+    # create database
     button1=tk.Button(frame_lst[0], text="Create Database")
     button1.bind("<Button-1>", callback)
     button1.pack(fill="both", expand="True")
 
+    # raid setting
     button2=tk.Button(frame_lst[1], text="RAID Setting")
     button2.bind("<Button-1>", callback)
     button2.pack(fill="both", expand="True")
 
+    # create disk
     button3=tk.Button(frame_lst[2], text="Create Disk")
     button3.bind("<Button-1>", callback)
     button3.pack(fill="both", expand="True")
 
+    # erase whole database
     button4=tk.Button(frame_lst[3], text="Erase Database")
     button4.bind("<Button-1>", callback)
     button4.pack(fill="both", expand="True")
 
+    # information panel
     label1=tk.Label(frame_lst[4], relief="sunken")
     label1.pack(fill="both", expand="True")
 
+    # remove disk
     button5=tk.Button(frame_lst[5], text="Remove Disk")
     button5.bind("<Button-1>", callback)
     button5.pack(fill="both", expand="True")
